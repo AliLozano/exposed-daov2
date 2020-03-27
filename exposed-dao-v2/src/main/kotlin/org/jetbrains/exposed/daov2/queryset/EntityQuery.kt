@@ -6,7 +6,6 @@ import org.jetbrains.exposed.daov2.entities.identifiers.DaoEntityID
 import org.jetbrains.exposed.daov2.manager.EntityManager
 import org.jetbrains.exposed.daov2.deleteWhere
 import org.jetbrains.exposed.daov2.manager.CopiableObject
-import org.jetbrains.exposed.daov2.manager.EntityManagerBase
 import org.jetbrains.exposed.daov2.manager.wrapRow
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.statements.UpdateStatement
@@ -27,7 +26,7 @@ internal fun <T> localTransaction(statement: Transaction.() -> T): T {
     }
 }
 
-interface EntityQuery<ID : Comparable<ID>, E : Entity<ID>, T: EntityManagerBase<ID, E>> {
+interface EntityQuery<ID : Comparable<ID>, E : Entity<ID>, T: EntityManager<ID, E, *>> {
     val rawQuery: Query
     val entityQuery: EntityQuery<ID, E, T>
     operator fun iterator() : Iterator<E>
@@ -58,8 +57,8 @@ interface EntityQuery<ID : Comparable<ID>, E : Entity<ID>, T: EntityManagerBase<
     fun selectRelated(vararg tables: EntityManager<*, *, *>): EntityQuery<ID, E, T>
     fun prefetchRelated(vararg tables: EntityManager<*, *, *>): EntityQuery<ID, E, T>
 }
-
-class EntitySizedIterable<ID : Comparable<ID>, E : Entity<ID>> internal constructor(val queryBase: EntityQuery<ID, E, *>) : SizedIterable<E> {
+// puede cambiairse a inline class
+class EntitySizedIterable<ID : Comparable<ID>, E : Entity<ID>> constructor(val queryBase: EntityQuery<ID, E, *>) : SizedIterable<E> {
     override fun limit(n: Int, offset: Long) = EntitySizedIterable(queryBase.limit(n, offset))
 
     override fun count() = queryBase.count()
@@ -70,16 +69,13 @@ class EntitySizedIterable<ID : Comparable<ID>, E : Entity<ID>> internal construc
 
     override fun orderBy(vararg order: Pair<Expression<*>, SortOrder>) = EntitySizedIterable(queryBase.orderBy(*order))
 
-    private val elements by lazy { queryBase.iterator().asSequence().toList() }
-
-    override fun iterator() = elements.iterator()
+    override fun iterator() = queryBase.iterator()
 
 }
 
 
-open class EntityQueryBase<ID : Comparable<ID>, E : Entity<ID>, T : EntityManagerBase<ID, E>>(val entityManager: T,
-                                                                                              private val defaultQuery: Query?=null) : EntityQuery<ID, E, T> {
-    override val rawQuery: Query by lazy { defaultQuery?: entityManager.defaultQuery    }
+open class EntityQueryBase<ID : Comparable<ID>, E : Entity<ID>, T : EntityManager<ID, E, *>>(val entityManager: T,
+                                                                                              override val rawQuery: Query) : EntityQuery<ID, E, T> {
 
     private val selectRelatedTables = mutableSetOf<EntityManager<Comparable<Any>,*,*>>()
     private val prefetchRelatedTables = mutableSetOf<EntityManager<Comparable<Any>,*,*>>()
@@ -107,27 +103,38 @@ open class EntityQueryBase<ID : Comparable<ID>, E : Entity<ID>, T : EntityManage
 
     override fun orderBy(@Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE") vararg columns: Pair<Expression<*>, SortOrder>) = entityQuery.apply { rawQuery.orderBy(*columns) }
 
-    override fun iterator() = localTransaction {
+    private var elements: List<E>? = null
+
+    override fun iterator() = elements?.iterator() ?: fetchElements()
+
+    fun fetchElements() = localTransaction {
         val selectIdRelateds = linkedMapOf<EntityManager<Comparable<Any>, *, *>, MutableList<EntityID<Comparable<Any>>>>()
 
         val results = execQuery().map { row ->
-            selectRelatedTables.forEach {
+/*            selectRelatedTables.forEach {
                 selectIdRelateds.getOrPut(it) { mutableListOf() }.add(row[it.id]) // this id is the related id instead its own id.
-            }
+            }*/
             entityManager.wrapRow(row, rawQuery.isForUpdate())
         }.toList()// toList() execute
 
+        selectRelatedTables.forEach { table ->
+            val query = table.relatedJoinQuery(rawQuery.copy())
+            table.buildEntityQuery(query)
+        }
+
+/*
         selectIdRelateds.map { (table, ids) ->
-            table.objects.filterByEntityIds(ids).iterator()
+
         }.toList() // toList: Execute
+*/
 
-        results.iterator()
+        elements = results.iterator().asSequence().toList()
+        elements!!.iterator()
     }
-
 
     fun execQuery(): Sequence<ResultRow> = rawQuery.asSequence()
 
-    override fun all() = EntitySizedIterable(this)
+    override fun all() = fetchElements().let { EntitySizedIterable(this) }
 
     override fun forUpdate() = entityQuery.apply { rawQuery.forUpdate() }
 
@@ -203,12 +210,19 @@ open class EntityQueryBase<ID : Comparable<ID>, E : Entity<ID>, T : EntityManage
 
     private val selfConstructor by lazy {
         try {
-            this.javaClass.getDeclaredConstructor(EntityManagerBase::class.java, Query::class.java).also { constructor ->
+            this.javaClass.getDeclaredConstructor(EntityManager::class.java, Query::class.java).also { constructor ->
                 constructor.isAccessible = true
             }
         }catch (ex: NoSuchMethodException) { error("EntityQuery need a constructor with entitymanager and query parameters.") }
     }
 
+    /**
+     * Cada vez que se ejecuta un filtro se copiia y devuelve un nuevo objeto, si no copiara el objeto, estas querys se unirían.
+     *
+     * query = users.objects.filter { isDeleted eq True }
+     * users.filter { name like "A%" }
+     * users.filter { name like "B%" } // al modificar la misma query devolverían name = "A" and name = "B"
+     */
     override val entityQuery: EntityQueryBase<ID, E, T> get() = copy()
 
 }

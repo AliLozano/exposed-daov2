@@ -86,12 +86,16 @@ abstract class MutableResultRow<ID : Comparable<ID>> {
         if(_flushAction == FlushAction.NONE) {
             _flushAction = if (this.db==null) FlushAction.INSERT else FlushAction.UPDATE
         }
-        this.savedValues = prepareDataToWrite() // snapshot // todo excluir los datos que no se tienen que actualizar
+        this.savedValues = prepareDataToWrite()
         this.db = db
     }
-
+    /*
+    * readValues + writeValues
+    * */
     @Suppress("UNCHECKED_CAST")
     private fun prepareDataToWrite(): MutableMap<Column<Any?>, Any?> {
+        if (flushAction == FlushAction.UPDATE) return writeValues
+
         val dataToWrite = mutableMapOf<Column<Any?>, Any?>()
         dataToWrite.putAll(writeValues)
         readValues.fieldIndex.keys.filter { readValues.hasValue(it) && it !in this.writeValues }.forEach {
@@ -172,5 +176,15 @@ abstract class MutableResultRow<ID : Comparable<ID>> {
             references.clear();
             references.putAll(it)
         }
+    }
+
+    private var oneToManyQueries = mutableMapOf<Column<*>, OneToManyQuery<*,*,*>>()
+
+    @Suppress("UNCHECKED_CAST")
+    fun <E : Entity<ID>, M : EntityManager<ID, E, M>> getOneToMany(column: Column<EntityID<ID>>): OneToManyQuery<ID, E, M> {
+        return oneToManyQueries.getOrPut(column) {
+            val table = column.table as M
+            OneToManyQuery(table, column.table.select { column eq this@MutableResultRow.id }) // todo hacer el inner join
+        } as OneToManyQuery<ID, E, M>
     }
 }

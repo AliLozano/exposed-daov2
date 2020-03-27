@@ -37,7 +37,7 @@ class EntityLazyObjects {
         School.new { name = "School"; region = Region.new { name = "Region"; country = Country.new  { name="Country" }} }
 
         val school = School.objects.first()
-        assertThat(school.region.id).isEqualTo(1)
+        assertThat(school.region.id.value).isEqualTo(1)
     }
 
     @Test

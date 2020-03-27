@@ -1,11 +1,16 @@
 package org.jetbrains.exposed.daov2
 
+import org.jetbrains.exposed.daov2.entities.*
 import org.jetbrains.exposed.daov2.entities.generics.IntEntity
 import org.jetbrains.exposed.daov2.entities.generics.IntEntityManager
-import org.jetbrains.exposed.daov2.entities.getValue
-import org.jetbrains.exposed.daov2.entities.manyToOne
-import org.jetbrains.exposed.daov2.entities.manyToOptional
-import org.jetbrains.exposed.daov2.entities.nullable
+import org.jetbrains.exposed.daov2.manager.EntityManager
+import org.jetbrains.exposed.daov2.manager.oneToMany
+import org.jetbrains.exposed.daov2.manager.oneToManyRef
+import org.jetbrains.exposed.daov2.queryset.EntityQuery
+import org.jetbrains.exposed.daov2.queryset.EntityQueryBase
+import org.jetbrains.exposed.daov2.queryset.EntitySizedIterable
+import org.jetbrains.exposed.sql.Query
+import kotlin.reflect.KProperty
 
 
 open class CountryTable: IntEntityManager<Country, CountryTable>() {
@@ -36,10 +41,26 @@ open class SchoolTable: IntEntityManager<School, SchoolTable>() {
 }
 
 
+
 class School : IntEntity() {
     companion object Table: SchoolTable()
 
     var name by Table.name
     var region by Table.region
     var secondaryRegion by Table.secondaryRegion.nullable()
+}
+
+val RegionTable.schools by oneToManyRef(School.region, School)
+val RegionTable.schoolsSecondary by oneToManyRef(School.secondaryRegion, School)
+
+val Region.schools by Region.schools.oneToMany()
+val Region.schoolsSecondary by Region.schoolsSecondary.oneToMany()
+
+
+fun main() {
+    Region.objects.filter { schools.name eq "" }.all().forEach {
+        it.schools.all().map {
+
+        }
+    }
 }

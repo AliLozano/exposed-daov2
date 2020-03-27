@@ -3,20 +3,13 @@ package org.jetbrains.exposed.daov2.manager
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.daov2.entities.Entity
 import org.jetbrains.exposed.dao.id.IdTable
-import org.jetbrains.exposed.daov2.deleteWhere
-import org.jetbrains.exposed.daov2.entities.getValue
 import org.jetbrains.exposed.daov2.exceptions.EntityNotFoundException
 import org.jetbrains.exposed.daov2.queryset.EntityQueryBase
-import org.jetbrains.exposed.daov2.queryset.joinWithParent
 import org.jetbrains.exposed.daov2.queryset.localTransaction
 import org.jetbrains.exposed.daov2.signals.EntityChangeType
 import org.jetbrains.exposed.daov2.signals.registerChange
 import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.TransactionManager
-import java.util.*
-import kotlin.reflect.KClass
-import kotlin.sequences.Sequence
 
 val transactionExist get() = TransactionManager.isInitialized() && TransactionManager.currentOrNull() != null
 
@@ -54,12 +47,14 @@ interface CopiableObject<M: CopiableObject<M>> {
 }
 
 @Suppress("UNCHECKED_CAST")
-abstract class EntityManagerBase<ID : Comparable<ID>, E : Entity<ID>>(name: String = "") : IdTable<ID>(), SqlExpressionBuilderClass {
+abstract class EntityManager<ID : Comparable<ID>, E : Entity<ID>, M : EntityManager<ID, E, M>>(name: String = "") : IdTable<ID>(), SqlExpressionBuilderClass {
     val originalId: Column<EntityID<ID>> get() = this.id.referee() ?: this.id
 
     private val klass = this.javaClass.enclosingClass
+
     private val ctor = klass.constructors.first()
-    abstract val objects: EntityQueryBase<ID, E, *>
+
+    val objects: EntityQueryBase<ID, E, M> = this.buildEntityQuery()
 
     var relatedColumnId: Column<Any>? = null
 
@@ -80,13 +75,14 @@ abstract class EntityManagerBase<ID : Comparable<ID>, E : Entity<ID>>(name: Stri
 
     open fun createInstance() = ctor.newInstance() as E
 
-    open val defaultQuery by lazy { this.selectAll() }
+    open val defaultQuery get() = this.selectAll()
 
-    private fun relatedQuery(): Query? {
-        return aliasRelated?.let {thisAlias ->
+    fun relatedJoinQuery(query: Query): Query? {
+        val queryResult = query.copy()
+        return aliasRelated?.let { thisAlias ->
             val parent = relatedColumnId!!.table as EntityManager<*,*, *>
             val parentId = parent.aliasRelated?.let { it[relatedColumnId!!] } ?: relatedColumnId!!
-            this.innerJoin(parent.defaultQuery.set.source, { thisAlias[relatedColumnId!!.referee!!] }, { parentId }).selectAll()
+            this.innerJoin(parent.relatedJoinQuery(queryResult)?.set?.source ?: parent, { thisAlias[relatedColumnId!!.referee!!] }, { parentId }).selectAll()
         }
     }
 
@@ -94,33 +90,29 @@ abstract class EntityManagerBase<ID : Comparable<ID>, E : Entity<ID>>(name: Stri
     fun asRelatedTable(column: Column<Any>) { this.relatedColumnId = column }
 
     open fun findResultRowById(id: EntityID<ID>): ResultRow? = localTransaction {
-        select(this@EntityManagerBase.originalId eq id).firstOrNull()
+        select(this@EntityManager.originalId eq id).firstOrNull()
     }
+
+
 
     open fun save(prototype: E): E = prototype.also {
         localTransaction {
-            cache.scheduleSave(this@EntityManagerBase, prototype)
+            cache.scheduleSave(this@EntityManager, prototype)
         }
     }
 
     open fun delete(id: EntityID<ID>) = localTransaction {
-        objects.filter { this@EntityManagerBase.id eq id }.delete()
-        cache[this@EntityManagerBase].remove(id)
-        TransactionManager.current().registerChange(this@EntityManagerBase, id, EntityChangeType.Removed)
+        objects.filter { this@EntityManager.id eq id }.delete()
+        cache[this@EntityManager].remove(id)
+        TransactionManager.current().registerChange(this@EntityManager, id, EntityChangeType.Removed)
     }
 
 
+    fun buildEntityQuery(initQuery: Query? = null): EntityQueryBase<ID, E, M> = EntityQueryBase(this as M, initQuery ?: defaultQuery)
 
-}
-
-
-
-@Suppress("UNCHECKED_CAST")
-abstract class EntityManager<ID : Comparable<ID>, E : Entity<ID>, M : EntityManager<ID, E, M>>(name: String = "") : EntityManagerBase<ID, E>(), CopiableObject<M> {
-    override val objects: EntityQueryBase<ID, E, M> = EntityQueryBase(this as M)
-
-    override fun copy(): M = this.javaClass.constructors.first().let {
+    fun copy(): M = this.javaClass.constructors.first().let {
         it.isAccessible = true
         it.newInstance(null) as M
     }
+
 }

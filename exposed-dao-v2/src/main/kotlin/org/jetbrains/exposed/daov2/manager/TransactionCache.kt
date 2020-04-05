@@ -4,6 +4,8 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.dao.id.IdTable
 import org.jetbrains.exposed.daov2.entities.Entity
 import org.jetbrains.exposed.daov2.entities.FlushAction
+import org.jetbrains.exposed.daov2.queryset.EntityQuery
+import org.jetbrains.exposed.daov2.queryset.EntityQueryBase
 import org.jetbrains.exposed.daov2.signals.EntityChangeType
 import org.jetbrains.exposed.daov2.signals.registerChange
 import org.jetbrains.exposed.sql.*
@@ -46,7 +48,7 @@ internal class TransactionTableCache<ID : Comparable<ID>, T: IdTable<ID>>(val ta
     private var flushingInserts by transactionScope { false }
 
     fun flushInserts() {
-       // if (flushingInserts) return
+        if (flushingInserts) return
         flushingInserts = true
         try {
             var toFlush = this.inserts.toList()
@@ -115,7 +117,6 @@ internal class TransactionTableCache<ID : Comparable<ID>, T: IdTable<ID>>(val ta
         }
         return true
     }
-
 
 }
 

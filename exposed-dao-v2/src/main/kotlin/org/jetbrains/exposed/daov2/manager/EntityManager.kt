@@ -82,7 +82,7 @@ abstract class EntityManager<ID : Comparable<ID>, E : Entity<ID>, M : EntityMana
         return aliasRelated?.let { thisAlias ->
             val parent = relatedColumnId!!.table as EntityManager<*,*, *>
             val parentId = parent.aliasRelated?.let { it[relatedColumnId!!] } ?: relatedColumnId!!
-            this.innerJoin(parent.relatedJoinQuery(queryResult)?.set?.source ?: parent, { thisAlias[relatedColumnId!!.referee!!] }, { parentId }).selectAll()
+            thisAlias.innerJoin(parent.relatedJoinQuery(queryResult)?.set?.source ?: parent, { thisAlias[relatedColumnId!!.referee!!] }, { parentId }).selectAll()
         }
     }
 

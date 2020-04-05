@@ -36,9 +36,9 @@ abstract class MutableResultRow<ID : Comparable<ID>> {
     /*
     * Result row from DB
     * */
-    internal fun init(db: Database, resultRow: ResultRow, updateOnFlush: Boolean=false) {
+    internal fun init(db: Database, id: EntityID<ID>, resultRow: ResultRow, updateOnFlush: Boolean=false) {
         this.db = db
-        this.id._value = resultRow[table.id]._value
+        this.id._value = id._value
         this.updateOnFlush = updateOnFlush
         this._readValues = resultRow
         buildReferences()

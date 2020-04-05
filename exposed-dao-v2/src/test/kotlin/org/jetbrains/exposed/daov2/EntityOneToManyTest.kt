@@ -1,5 +1,6 @@
 package org.jetbrains.exposed.daov2
 
+import io.mockk.spyk
 import org.assertj.core.api.Assertions.assertThat
 import org.jetbrains.exposed.daov2.manager.new
 import org.jetbrains.exposed.daov2.queryset.first
@@ -8,20 +9,28 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.*
+import java.sql.Connection
+import java.sql.DriverManager
 
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class EntityOneToManyTest {
 
+    lateinit var connection: Connection
+
+    @BeforeAll
+    fun beforeAll() {
+        Class.forName("org.h2.Driver").newInstance()
+
+        Database.connect({
+            connection = spyk(DriverManager.getConnection("jdbc:h2:mem:regular;DB_CLOSE_DELAY=-1;", "", ""))
+            connection
+        })
+    }
 
     @BeforeEach
     fun before() {
-        Database.connect("jdbc:h2:mem:regular;DB_CLOSE_DELAY=-1;")
-
         transaction {
             SchemaUtils.create(Country, Region, School)
         }
@@ -34,8 +43,18 @@ class EntityOneToManyTest {
         }
     }
 
+    @Test
+    fun `Test access related queryset in one to many`() {
 
+        val argentina = Country.new { name = "Argentina" }
+        val australia = Country.new { name = "Australia" }
+        val peru = Country.new { name = "Peru" }
+        val lima = Region.new { name = "Lima"; country = peru }
+        val tujillo = Region.new { name = "Trujillo"; country = peru }
+        val buenosAires = Region.new { name = "Buenos Aires"; country = argentina }
 
+        assertThat(peru.regions.count()).isEqualTo(2)
+    }
 
     @Test
     fun `Test filter by one to many`() {

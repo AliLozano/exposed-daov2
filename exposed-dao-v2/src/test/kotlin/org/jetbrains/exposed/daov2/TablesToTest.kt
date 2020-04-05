@@ -51,7 +51,11 @@ class School : IntEntity() {
 }
 
 val RegionTable.schools by oneToManyRef(School.region, School)
-// val RegionTable.schoolsSecondary by oneToManyRef(School.secondaryRegion, School)
+val RegionTable.schoolsSecondary by oneToManyRef(School.secondaryRegion, School)
+val CountryTable.regions by oneToManyRef(Region.country, Region)
 
 val Region.schools by Region.schools.oneToMany()
-// val Region.schoolsSecondary by Region.schoolsSecondary.oneToMany()
+val Region.schoolsSecondary by Region.schoolsSecondary.oneToMany()
+val Country.regions by Country.regions.oneToMany()
+
+

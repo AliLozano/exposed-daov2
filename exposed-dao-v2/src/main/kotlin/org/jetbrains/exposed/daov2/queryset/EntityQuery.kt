@@ -76,12 +76,11 @@ class EntitySizedIterable<ID : Comparable<ID>, E : Entity<ID>> constructor(val q
     }
 }
 
-
 open class EntityQueryBase<ID : Comparable<ID>, E : Entity<ID>, T : EntityManager<ID, E, *>>(val entityManager: T,
                                                                                               override val rawQuery: Query) : EntityQuery<ID, E, T> {
 
-    private val selectRelatedTables = mutableSetOf<EntityManager<Comparable<Any>,*,*>>()
-    private val prefetchRelatedTables = mutableSetOf<EntityManager<Comparable<Any>,*,*>>()
+    private val selectRelatedTables = mutableSetOf<EntityManager<Comparable<Any>, Entity<Comparable<Any>>, *>>()
+    private val prefetchRelatedTables = mutableSetOf<EntityManager<Comparable<Any>, Entity<Comparable<Any>>, *>>()
 
     override fun limit(size: Int, offset: Long) = entityQuery.apply { rawQuery.limit(size, offset) }
 
@@ -110,26 +109,30 @@ open class EntityQueryBase<ID : Comparable<ID>, E : Entity<ID>, T : EntityManage
 
     override fun iterator() = elements?.iterator() ?: fetchElements()
 
-    fun fetchElements() = localTransaction {
-        val selectIdRelateds = linkedMapOf<EntityManager<Comparable<Any>, *, *>, MutableList<EntityID<Comparable<Any>>>>()
+    fun fetchElements(): Iterator<E> = localTransaction {
+        val ids = linkedMapOf<Column<*>, MutableList<EntityID<Comparable<Any>>>>()
+        prefetchRelatedTables.forEach {// tod: esta lsita puede ser seteada al momento de hacer prefetchRelated()
+            var table = it
+            while (table.relatedColumnId != null) {
+                if (table.relatedColumnId!!.table == this@EntityQueryBase.entityManager) {
+                    ids.getOrPut(table.relatedColumnId!!) { mutableListOf() }
+                    break
+                } else {
+                    table = table.relatedColumnId!!.table as EntityManager<Comparable<Any>, Entity<Comparable<Any>>, *>
+                }
+
+            }
+        }
 
         val results = execQuery().map { row ->
-/*            selectRelatedTables.forEach {
-                selectIdRelateds.getOrPut(it) { mutableListOf() }.add(row[it.id]) // this id is the related id instead its own id.
-            }*/
+            ids.forEach { column, list -> list.add(row[column] as EntityID<Comparable<Any>>) } // prefetch related.
             entityManager.wrapRow(row, rawQuery.isForUpdate())
         }.toList()// toList() execute
 
-        selectRelatedTables.forEach { table ->
-            val query = table.relatedJoinQuery(rawQuery.copy())
-            table.buildEntityQuery(query)
+        ids.forEach { column, list ->
+            val table = column.referee!!.table as EntityManager<Comparable<Any>,Entity<Comparable<Any>>,*>
+            table.objects.filterByEntityIds(list).prefetchRelated(*prefetchRelatedTables.toTypedArray()).all()
         }
-
-/*
-        selectIdRelateds.map { (table, ids) ->
-
-        }.toList() // toList: Execute
-*/
 
         elements = results.iterator().asSequence().toList()
         elements!!.iterator()
@@ -178,11 +181,11 @@ open class EntityQueryBase<ID : Comparable<ID>, E : Entity<ID>, T : EntityManage
     }
 
     override fun selectRelated(vararg tables: EntityManager<*,*,*>) = entityQuery.apply {
-        this.selectRelatedTables += tables.asList() as Collection<EntityManager<Comparable<Any>, *, *>>
+        this.selectRelatedTables += tables.asList() as Collection<EntityManager<Comparable<Any>, Entity<Comparable<Any>>, *>>
     }
 
     override fun prefetchRelated(vararg tables: EntityManager<*,*,*>) = entityQuery.apply {
-        this.prefetchRelatedTables += tables.asList() as Collection<EntityManager<Comparable<Any>, *, *>>
+        this.prefetchRelatedTables += tables.asList() as Collection<EntityManager<Comparable<Any>, Entity<Comparable<Any>>, *>>
     }
 
     override fun filterByEntityIds(ids: List<EntityID<ID>>) = filter { entityManager.originalId inList ids }

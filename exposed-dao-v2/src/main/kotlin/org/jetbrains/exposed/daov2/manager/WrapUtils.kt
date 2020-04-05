@@ -59,11 +59,12 @@ fun <ID : Comparable<ID>, E : Entity<ID>> EntityManager<ID, E, *>.wrapRow(row: R
 
 @Suppress("UNCHECKED_CAST")
 internal fun <ID : Comparable<ID>, E : Entity<ID>> EntityManager<ID, E, *>.wrap(row: ResultRow, isForUpdate: Boolean = false): E {
-    val found = cache[this].find(row[this.originalId])?.apply { readValues = row }
+    val entityId = row[this.originalId]
+    val found = cache[this].find(entityId)?.apply { readValues = row }
     if (found != null) return found as E
 
     return createInstance().also {
-        it.init(cache[this].transaction.db, row, isForUpdate)
+        it.init(cache[this].transaction.db, entityId, row, isForUpdate)
         cache[this].store(it)
     }
 }

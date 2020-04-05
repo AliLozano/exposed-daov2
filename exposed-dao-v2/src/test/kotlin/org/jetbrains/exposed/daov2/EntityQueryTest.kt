@@ -1,5 +1,6 @@
 package org.jetbrains.exposed.daov2
 
+import io.mockk.spyk
 import org.assertj.core.api.Assertions.assertThat
 import org.jetbrains.exposed.daov2.entities.generics.IntEntity
 import org.jetbrains.exposed.daov2.entities.generics.IntEntityManager
@@ -11,14 +12,26 @@ import org.jetbrains.exposed.daov2.queryset.last
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.*
+import java.sql.Connection
+import java.sql.DriverManager
 
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class EntityQueryTest {
+    lateinit var connection: Connection
+
+    @BeforeAll
+    fun beforeAll() {
+        Class.forName("org.h2.Driver").newInstance()
+
+        Database.connect({
+            connection = spyk(DriverManager.getConnection("jdbc:h2:mem:regular;DB_CLOSE_DELAY=-1;", "", ""))
+            connection
+        })
+    }
+
     @BeforeEach
     fun before() {
-        Database.connect("jdbc:h2:mem:regular;DB_CLOSE_DELAY=-1;")
-
         transaction {
             SchemaUtils.create(Country, Region, School)
         }

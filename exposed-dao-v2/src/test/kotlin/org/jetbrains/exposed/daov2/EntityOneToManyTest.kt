@@ -2,6 +2,7 @@ package org.jetbrains.exposed.daov2
 
 import org.assertj.core.api.Assertions.assertThat
 import org.jetbrains.exposed.daov2.manager.new
+import org.jetbrains.exposed.daov2.queryset.first
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.and
@@ -14,7 +15,7 @@ import org.junit.jupiter.api.TestInstance
 
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class EntityManyToOneTest {
+class EntityOneToManyTest {
 
 
     @BeforeEach
@@ -37,20 +38,25 @@ class EntityManyToOneTest {
 
 
     @Test
-    fun `Test that we can use id column of manager in querys without inner join`() {
+    fun `Test filter by one to many`() {
+
         Country.new { name = "Argentina" }
         Country.new { name = "Australia" }
         val peru = Country.new { name = "Peru" }
-        Region.new { name = "Lima"; country = peru }
+        val lima = Region.new { name = "Lima"; country = peru }
 
-        Region.objects.filter { country.id eq 1 }
+        School.new { name = "Escuela 1"; region = lima }
+        School.new { name = "Escuela 2"; region = lima }
+        School.new { name = "Colegio"; region = lima }
+
 
         transaction {
-            val result = Region.selectAll().first()
-            assertThat(result[Region.country.id]).isEqualTo(peru.id)
+            val result = Region.objects.filter { schools.name like "Escuela%" }.first()
+            //val result = Region.selectAll().first()
+            assertThat(result.id).isEqualTo(lima.id)
         }
     }
-
+    /*
     @Test
     fun `Test simple inner join`() {
         Country.new { name = "Argentina" }
@@ -97,5 +103,6 @@ class EntityManyToOneTest {
             assertThat(it).isEqualTo(2)
         }
     }
+     */
 
 }

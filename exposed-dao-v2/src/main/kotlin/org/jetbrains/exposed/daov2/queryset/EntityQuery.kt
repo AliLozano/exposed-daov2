@@ -71,6 +71,9 @@ class EntitySizedIterable<ID : Comparable<ID>, E : Entity<ID>> constructor(val q
 
     override fun iterator() = queryBase.iterator()
 
+    override fun forUpdate(): SizedIterable<E> {
+        return queryBase.forUpdate().all()
+    }
 }
 
 
@@ -152,7 +155,7 @@ open class EntityQueryBase<ID : Comparable<ID>, E : Entity<ID>, T : EntityManage
 
     override fun exclude(op: Op<Boolean>): EntityQuery<ID, E, T> = entityQuery.apply { rawQuery.adjustWhere { not(op) } }
 
-    override fun filter(where: T.() -> Op<Boolean>): EntityQuery<ID, E, T> = entityQuery.apply {
+    override fun filter(where: T.() -> Op<Boolean>): EntityQuery<ID, E, T> = entityQuery.apply { // T es de tipo Table
         val manager = (entityManager as CopiableObject<*>).copy() as T
         val exp = manager.where()
         manager.relatedJoin?.let { joinFn -> rawQuery.adjustColumnSet { joinFn(this) }}

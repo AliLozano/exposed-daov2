@@ -13,8 +13,8 @@ repositories {
 }
 
 dependencies {
-    implementation("org.jetbrains.exposed", "exposed-core", "0.21.2")
-    implementation("org.jetbrains.exposed", "exposed-jdbc", "0.21.2")
+    implementation("org.jetbrains.exposed", "exposed-core", "0.22.2")
+    implementation("org.jetbrains.exposed", "exposed-jdbc", "0.22.2")
     implementation("com.h2database", "h2", "1.4.200")
     implementation("io.github.microutils:kotlin-logging:1.7.8")
     implementation("ch.qos.logback:logback-classic:1.2.3")

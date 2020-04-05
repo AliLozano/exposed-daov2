@@ -70,6 +70,14 @@ class NullableRelation<ID: Comparable<ID>, E: Entity<ID>, M: EntityManager<ID, E
 
 fun <ID: Comparable<ID>, E: Entity<ID>, M: EntityManager<ID, E, M>> M.nullable() = NullableRelation(this)
 
-operator fun <ID: Comparable<ID>, E: Entity<ID>, M: EntityManager<ID, E, M>> M.getValue(table: EntityManager<*, *, *>, property: KProperty<*>): M {
+/**
+ *
+ */
+operator fun <ID: Comparable<ID>, E: Entity<ID>, M: EntityManager<ID, E, M>> M.getValue(rightTable: EntityManager<*, *, *>, property: KProperty<*>): M {
+    /*return rightTable.relatedColumnId?.let { relatedColumn ->
+        if(relatedColumn.referee.toString() == this.toString()) { return relatedColumn as M } // si es el id.
+        rightTable.joinWithParent()
+        return rightTable.aliasRelated!!.get(this) as M
+    } ?: this*/
     return this
 }

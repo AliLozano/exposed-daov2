@@ -47,7 +47,7 @@ interface CopiableObject<M: CopiableObject<M>> {
 }
 
 @Suppress("UNCHECKED_CAST")
-abstract class EntityManager<ID : Comparable<ID>, E : Entity<ID>, M : EntityManager<ID, E, M>>(name: String = "") : IdTable<ID>(), SqlExpressionBuilderClass {
+abstract class EntityManager<ID : Comparable<ID>, E : Entity<ID>, M : EntityManager<ID, E, M>>(name: String = "") : IdTable<ID>(), SqlExpressionBuilderClass, CopiableObject<M> {
     val originalId: Column<EntityID<ID>> get() = this.id.referee() ?: this.id
 
     private val klass = this.javaClass.enclosingClass
@@ -110,7 +110,7 @@ abstract class EntityManager<ID : Comparable<ID>, E : Entity<ID>, M : EntityMana
 
     fun buildEntityQuery(initQuery: Query? = null): EntityQueryBase<ID, E, M> = EntityQueryBase(this as M, initQuery ?: defaultQuery)
 
-    fun copy(): M = this.javaClass.constructors.first().let {
+    override fun copy(): M = this.javaClass.constructors.first().let {
         it.isAccessible = true
         it.newInstance(null) as M
     }

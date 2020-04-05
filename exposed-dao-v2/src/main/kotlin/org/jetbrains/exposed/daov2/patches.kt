@@ -10,4 +10,4 @@ operator fun ExpressionWithColumnType<String>.plus(t: String) = SqlExpressionBui
 
 // https://github.com/JetBrains/Exposed/issues/451
 fun Table.deleteWhere(limit: Int? = null, offset: Long? = null, op: SqlExpressionBuilder.()-> Op<Boolean>) =
-        DeleteStatement.where(TransactionManager.current(), this@deleteWhere, SqlExpressionBuilder.op(), false, limit, offset?.toInt())
+        DeleteStatement.where(TransactionManager.current(), this@deleteWhere, SqlExpressionBuilder.op(), false, limit, offset)

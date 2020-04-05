@@ -1,6 +1,7 @@
 package org.jetbrains.exposed.daov2
 
 import org.assertj.core.api.Assertions.assertThat
+import org.jetbrains.exposed.daov2.manager.flushCache
 import org.jetbrains.exposed.daov2.manager.new
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -170,13 +171,11 @@ class EntityOperationsTest {
 
     @Test
     fun `Update on flush`() {
-        val entity1 = Country.new { name = "Brazil" }
+        Country.new { name = "Brazil" }
 
         transaction {
-            val countries = Country.objects.all().forUpdate()
-            countries.forEach {
+           Country.objects.filter { name eq "Brazil" }.forUpdate {
                 it.name = "Ecuador"
-                // implicit save by for update
             }
         }
 

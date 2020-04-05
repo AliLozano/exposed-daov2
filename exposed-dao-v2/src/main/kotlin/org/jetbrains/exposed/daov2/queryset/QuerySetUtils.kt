@@ -27,6 +27,9 @@ fun EntityManager<*, *, *>.joinWithParent() {
 
     this.aliasRelated?.let { alias -> // join me with my parent
         val parentAlias = parent?.aliasRelated
-        addRelatedJoin { innerJoin(alias, { alias[relatedColumnId?.referee!!] }, { parentAlias?.let { it[relatedColumnId!!] } ?: relatedColumnId!! }) }
+        addRelatedJoin {
+            innerJoin(alias, { alias[relatedColumnId?.referee!!] }, { parentAlias?.let { it[relatedColumnId!!] } ?: relatedColumnId!! })
+        }
     }
 }
+

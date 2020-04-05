@@ -51,16 +51,7 @@ class School : IntEntity() {
 }
 
 val RegionTable.schools by oneToManyRef(School.region, School)
-val RegionTable.schoolsSecondary by oneToManyRef(School.secondaryRegion, School)
+// val RegionTable.schoolsSecondary by oneToManyRef(School.secondaryRegion, School)
 
 val Region.schools by Region.schools.oneToMany()
-val Region.schoolsSecondary by Region.schoolsSecondary.oneToMany()
-
-
-fun main() {
-    Region.objects.filter { schools.name eq "" }.all().forEach {
-        it.schools.all().map {
-
-        }
-    }
-}
+// val Region.schoolsSecondary by Region.schoolsSecondary.oneToMany()

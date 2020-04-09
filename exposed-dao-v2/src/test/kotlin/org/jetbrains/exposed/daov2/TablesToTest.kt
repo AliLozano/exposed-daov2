@@ -58,4 +58,3 @@ val Region.schools by Region.schools.oneToMany()
 val Region.schoolsSecondary by Region.schoolsSecondary.oneToMany()
 val Country.regions by Country.regions.oneToMany()
 
-

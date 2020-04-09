@@ -109,28 +109,61 @@ open class EntityQueryBase<ID : Comparable<ID>, E : Entity<ID>, T : EntityManage
 
     override fun iterator() = elements?.iterator() ?: fetchElements()
 
-    fun fetchElements(): Iterator<E> = localTransaction {
-        val ids = linkedMapOf<Column<*>, MutableList<EntityID<Comparable<Any>>>>()
-        prefetchRelatedTables.forEach {// tod: esta lsita puede ser seteada al momento de hacer prefetchRelated()
+    /*
+    * Get every direct column that we have to prefetch.
+    * */
+    fun getColumnsToPrefetch(): LinkedHashMap<Column<*>, MutableList<EntityID<Comparable<Any>>>> {
+        val relatedcolumnsToFetch = linkedMapOf<Column<*>, MutableList<EntityID<Comparable<Any>>>>()
+        prefetchRelatedTables.forEach {// todo: refactor, move this to other place.
             var table = it
             while (table.relatedColumnId != null) {
-                if (table.relatedColumnId!!.table == this@EntityQueryBase.entityManager) {
-                    ids.getOrPut(table.relatedColumnId!!) { mutableListOf() }
+                if (table.relatedColumnId!!.table == this@EntityQueryBase.entityManager) { // only if this table can handle it
+                    relatedcolumnsToFetch.getOrPut(table.relatedColumnId!!) { mutableListOf() }
                     break
                 } else {
                     table = table.relatedColumnId!!.table as EntityManager<Comparable<Any>, Entity<Comparable<Any>>, *>
                 }
-
             }
         }
+        return relatedcolumnsToFetch
+    }
+
+
+    fun joinWithSelectRelated() {
+        selectRelatedTables.forEach { // todo: refactor, move this to other place.
+            var table = it
+
+            while (table.relatedColumnId != null) {
+                val leftTable: Table = (table.relatedColumnId?.table as EntityManager<*,*,*>?)?.aliasRelated ?: this.entityManager
+                val newJoin = joinWith(leftTable, table.aliasRelated!!, table.relatedColumnId!!)
+                rawQuery.adjustColumnSet { newJoin() }
+                rawQuery.adjustSlice { this.slice(table.aliasRelated!!.columns + rawQuery.set.fields) }
+                table = table.relatedColumnId!!.table as EntityManager<Comparable<Any>, Entity<Comparable<Any>>, *>
+            }
+        }
+    }
+
+    fun fetchElements(): Iterator<E> = localTransaction {
+        joinWithSelectRelated()
+
+        val relatedcolumnsToFetch = getColumnsToPrefetch()
 
         val results = execQuery().map { row ->
-            ids.forEach { column, list -> list.add(row[column] as EntityID<Comparable<Any>>) } // prefetch related.
+            relatedcolumnsToFetch.forEach { column, list -> list.add(row[column] as EntityID<Comparable<Any>>) } // prefetch related.
+            selectRelatedTables.forEach { // todo: refactor, move this to other place.
+                var table = it
+                while (table.relatedColumnId != null) {
+                    table.wrapRow(row, table.aliasRelated!!, rawQuery.isForUpdate())
+                    table = table.relatedColumnId!!.table as EntityManager<Comparable<Any>, Entity<Comparable<Any>>, *>
+                }
+            }
             entityManager.wrapRow(row, rawQuery.isForUpdate())
         }.toList()// toList() execute
 
-        ids.forEach { column, list ->
+        relatedcolumnsToFetch.forEach { column, list ->
             val table = column.referee!!.table as EntityManager<Comparable<Any>,Entity<Comparable<Any>>,*>
+
+            // pass prefetch related to the child, if it can handle it will take and prefetch it.
             table.objects.filterByEntityIds(list).prefetchRelated(*prefetchRelatedTables.toTypedArray()).all()
         }
 
@@ -161,14 +194,18 @@ open class EntityQueryBase<ID : Comparable<ID>, E : Entity<ID>, T : EntityManage
     override fun filter(where: T.() -> Op<Boolean>): EntityQuery<ID, E, T> = entityQuery.apply { // T es de tipo Table
         val manager = (entityManager as CopiableObject<*>).copy() as T
         val exp = manager.where()
-        manager.relatedJoin?.let { joinFn -> rawQuery.adjustColumnSet { joinFn(this) }}
+        manager.relatedJoin.forEach { _, joinFn ->
+            rawQuery.adjustColumnSet { joinFn(this) }
+        }
         rawQuery.adjustWhere { exp }
     }
 
     override fun exclude(where: T.() -> Op<Boolean>): EntityQuery<ID, E, T> = entityQuery.apply {
         val manager = (entityManager as CopiableObject<*>).copy() as T
         val exp = manager.where()
-        manager.relatedJoin?.let { joinFn -> rawQuery.adjustColumnSet { joinFn(this) }}
+        manager.relatedJoin.forEach { _, joinFn ->
+            rawQuery.adjustColumnSet { joinFn(this) }
+        }
         rawQuery.adjustWhere { not(exp) }
     }
 

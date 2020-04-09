@@ -29,6 +29,8 @@ abstract class MutableResultRow<ID : Comparable<ID>> {
 
     var db: Database? = null; private set
 
+    val isLoaded get() = _readValues != null
+
     init {
         this.id = DaoEntityID(null, table)
     }
@@ -115,7 +117,7 @@ abstract class MutableResultRow<ID : Comparable<ID>> {
         reset()
     }
 
-    private fun     checkValue(value: Any?): Any? {
+    private fun checkValue(value: Any?): Any? {
         val newValue = if (value is Entity<*>) value.id else value
         if (newValue is Entity<*> && newValue.db != this.db && newValue.db != this.db) {
             error("Can't link entities from different databases.")

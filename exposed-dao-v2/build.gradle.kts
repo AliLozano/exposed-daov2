@@ -13,15 +13,15 @@ repositories {
 }
 
 dependencies {
-    implementation("org.jetbrains.exposed", "exposed-core", "0.22.2")
-    implementation("org.jetbrains.exposed", "exposed-jdbc", "0.22.2")
+    implementation("org.jetbrains.exposed", "exposed-core", "0.23.2")
+    implementation("org.jetbrains.exposed", "exposed-jdbc", "0.23.2")
     implementation("com.h2database", "h2", "1.4.200")
     implementation("io.github.microutils:kotlin-logging:1.7.8")
     implementation("ch.qos.logback:logback-classic:1.2.3")
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.5.2")
     testRuntime("org.junit.jupiter:junit-jupiter-engine:5.5.2")
-
+    testImplementation("io.mockk:mockk:1.9.3")
     testImplementation("org.assertj:assertj-core:3.11.1")
     testImplementation("org.jetbrains.kotlin:kotlin-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")

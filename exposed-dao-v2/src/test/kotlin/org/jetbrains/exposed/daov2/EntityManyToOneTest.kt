@@ -86,7 +86,7 @@ class EntityManyToOneTest {
     }
 
     @Test
-    fun `Test query when query with inner join`() {
+    fun `Test doble query sql`() {
         Country.new { name = "Argentina" }
         Country.new { name = "Australia" }
         val peru = Country.new { name = "Peru" }
@@ -100,9 +100,9 @@ class EntityManyToOneTest {
             School.objects.filter { region.country.name eq "Peru" }.all()
             val sql = "SELECT SCHOOL.ID, SCHOOL.\"NAME\", SCHOOL.REGION_ID, SCHOOL.SECONDARY_REGION_ID" +
                     " FROM SCHOOL INNER JOIN REGION region_id_Region" +
-                    " ON region_id_Region.ID = SCHOOL.REGION_ID" +
+                    " ON SCHOOL.REGION_ID = region_id_Region.ID" +
                     " INNER JOIN COUNTRY country_Country" +
-                    " ON country_Country.ID = region_id_Region.COUNTRY" +
+                    " ON region_id_Region.COUNTRY = country_Country.ID" +
                     " WHERE country_Country.\"NAME\" = ?"
             verify(exactly = 1) { this@EntityManyToOneTest.connection.prepareStatement(sql, any<Int>()) }
 

@@ -57,6 +57,24 @@ class EntityOneToManyTest {
     }
 
     @Test
+    fun `Test foreach related`() {
+
+        val argentina = Country.new { name = "Argentina" }
+        val australia = Country.new { name = "Australia" }
+        val peru = Country.new { name = "Peru" }
+        val lima = Region.new { name = "Lima"; country = peru }
+        val tujillo = Region.new { name = "Trujillo"; country = peru }
+        val buenosAires = Region.new { name = "Buenos Aires"; country = argentina }
+
+        peru.regions.all().forEachIndexed { index, region ->
+            when(index) {
+                0 -> assertThat(region.name).isEqualTo("Lima")
+                1 -> assertThat(region.name).isEqualTo("Trujillo")
+            }
+        }
+    }
+
+    @Test
     fun `Test filter by one to many`() {
 
         Country.new { name = "Argentina" }
@@ -70,11 +88,36 @@ class EntityOneToManyTest {
 
 
         transaction {
-            val result = Region.objects.filter { schools.name like "Escuela%" }.first()
+            val result = Region.objects.filter {
+                schools.name like "Escuela%"
+            }.first()
             //val result = Region.selectAll().first()
             assertThat(result.id).isEqualTo(lima.id)
         }
     }
+
+    @Test
+    fun `Test filter by one to many to many`() {
+
+        Country.new { name = "Argentina" }
+        Country.new { name = "Australia" }
+        val peru = Country.new { name = "Peru" }
+        val lima = Region.new { name = "Lima"; country = peru }
+
+        School.new { name = "Escuela 1"; region = lima }
+        School.new { name = "Escuela 2"; region = lima }
+        School.new { name = "Colegio"; region = lima }
+
+
+        transaction {
+            val result = Country.objects.filter {
+                regions.schools.name like "Escuela%"
+            }.first()
+            //val result = Region.selectAll().first()
+            assertThat(result.id).isEqualTo(peru.id)
+        }
+    }
+
     /*
     @Test
     fun `Test simple inner join`() {

@@ -12,11 +12,14 @@ class OneToManyQuery<ID : Comparable<ID>, E : Entity<ID>, T : EntityManager<ID, 
     : EntityQueryBase<ID, E, T>(entityManager, rawQuery), Iterable<E>
 
 class OneToManyRelationRef<ID : Comparable<ID>, E : Entity<ID>, M : EntityManager<ID, E, M>>(val ref: M, val column: Column<Any>) {
+    /*
+    * Copy a table for use in querys.
+    * */
     operator fun <ID : Comparable<ID>, E : Entity<ID>,
             M2 : EntityManager<ID, E, M2>>
             getValue(table: EntityManager<ID, E, M2>, property: KProperty<*>): M {
         return ref.copy().also {
-            it.asRelatedTable(column)
+            it.asRelatedTable(column, table)
             it.joinWithParent()
         }
     }
@@ -24,7 +27,6 @@ class OneToManyRelationRef<ID : Comparable<ID>, E : Entity<ID>, M : EntityManage
 
 
 class OneToManyRelation<ID: Comparable<ID>, E: Entity<ID>, M: EntityManager<ID, E, M>>(val column: Column<EntityID<ID>>) {
-
     operator fun getValue(entity: Entity<ID>, property: KProperty<*>): OneToManyQuery<ID, E, M> {
         return entity.getOneToMany(column)
     }
@@ -32,7 +34,7 @@ class OneToManyRelation<ID: Comparable<ID>, E: Entity<ID>, M: EntityManager<ID, 
 
 fun <ID: Comparable<ID>, E: Entity<ID>, M: EntityManager<ID, E, M>,
         ID2: Comparable<ID2>, E2: Entity<ID2>, M2: EntityManager<ID2, E2, M2>> oneToManyRef(joinableTable: M, refTable: M2): OneToManyRelationRef<ID2, E2, M2> {
-    return OneToManyRelationRef(refTable, joinableTable.relatedColumnId?.referee()!!)
+    return OneToManyRelationRef(refTable, joinableTable.relatedColumnId!!)
 }
 
 fun <ID: Comparable<ID>, E: Entity<ID>, M: EntityManager<ID, E, M>> M.oneToMany(): OneToManyRelation<ID, E, M> {

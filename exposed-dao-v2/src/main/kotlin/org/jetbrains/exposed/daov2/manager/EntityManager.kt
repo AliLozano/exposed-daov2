@@ -5,6 +5,7 @@ import org.jetbrains.exposed.daov2.entities.Entity
 import org.jetbrains.exposed.dao.id.IdTable
 import org.jetbrains.exposed.daov2.exceptions.EntityNotFoundException
 import org.jetbrains.exposed.daov2.queryset.EntityQueryBase
+import org.jetbrains.exposed.daov2.queryset.joinWithParent
 import org.jetbrains.exposed.daov2.queryset.localTransaction
 import org.jetbrains.exposed.daov2.signals.EntityChangeType
 import org.jetbrains.exposed.daov2.signals.registerChange
@@ -46,8 +47,10 @@ interface CopiableObject<M: CopiableObject<M>> {
     fun copy(): M
 }
 
+typealias JoinFunction= (ColumnSet.() -> ColumnSet)
+
 @Suppress("UNCHECKED_CAST")
-abstract class EntityManager<ID : Comparable<ID>, E : Entity<ID>, M : EntityManager<ID, E, M>>(name: String = "") : IdTable<ID>(), SqlExpressionBuilderClass, CopiableObject<M> {
+abstract class EntityManager<ID : Comparable<ID>, E : Entity<ID>, M : EntityManager<ID, E, M>>(name: String = "") : IdTable<ID>(), ISqlExpressionBuilder, CopiableObject<M> {
     val originalId: Column<EntityID<ID>> get() = this.id.referee() ?: this.id
 
     private val klass = this.javaClass.enclosingClass
@@ -58,7 +61,7 @@ abstract class EntityManager<ID : Comparable<ID>, E : Entity<ID>, M : EntityMana
 
     var relatedColumnId: Column<Any>? = null
 
-    var relatedJoin: (ColumnSet.() -> ColumnSet)? = null // se utiliza para hacer los joins
+    var relatedJoin: MutableMap<Table, JoinFunction> = mutableMapOf() // se utiliza para hacer los joins
 
     val aliasRelated by lazy {
         // tener en cuenta que si se llama al alias related antes de setear el related column id, este se quedara como null
@@ -67,7 +70,7 @@ abstract class EntityManager<ID : Comparable<ID>, E : Entity<ID>, M : EntityMana
         }
     }
 
-    val parent get() = this.relatedColumnId?.table as EntityManager<*, *, *>?
+    var parent: EntityManager<*, *, *>? = null
 
     override var tableName = name.ifBlank { klass.simpleName!! }
 
@@ -87,7 +90,10 @@ abstract class EntityManager<ID : Comparable<ID>, E : Entity<ID>, M : EntityMana
     }
 
 
-    fun asRelatedTable(column: Column<Any>) { this.relatedColumnId = column }
+    fun asRelatedTable(column: Column<Any>, parent: EntityManager<*,*,*> = column.table as EntityManager<*,*,*>) {
+        this.relatedColumnId = column
+        this.parent = parent
+    }
 
     open fun findResultRowById(id: EntityID<ID>): ResultRow? = localTransaction {
         select(this@EntityManager.originalId eq id).firstOrNull()
